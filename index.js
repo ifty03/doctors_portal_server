@@ -17,23 +17,65 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+const verifyJwt = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "unAuthorize access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.SECRET_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "forbidden access" });
+    }
+    if (decoded) {
+      req.decoded = decoded;
+      next();
+    }
+  });
+};
+
 const run = async () => {
   try {
     await client.connect();
     const serviceCollection = client.db("doctors_db").collection("tritment");
     const bookingCollection = client.db("doctors_db").collection("booking");
-
-    /* gwt token created */
-    app.post("/login", (req, res) => {
-      const email = req.body;
-      const token = jwt.sign(email, process.env.SECRET_TOKEN);
-      res.send({ token });
-    });
+    const userCollection = client.db("doctors_db").collection("users");
 
     app.get("/service", async (req, res) => {
       const query = {};
       const service = await serviceCollection.find(query).toArray();
       res.send(service);
+    });
+    /* get all user in database */
+    app.get("/users", verifyJwt, async (req, res) => {
+      const users = await userCollection.find().toArray();
+      res.send(users);
+    });
+
+    /* make an admin role */
+    app.put("/user/admin/:email", verifyJwt, async (req, res) => {
+      const email = req.params.email;
+      const filter = { email: email };
+      const updateDoc = {
+        $set: { role: "admin" },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    /* user data stored in database */
+    app.put("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const token = jwt.sign(email, process.env.SECRET_TOKEN);
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      console.log(token);
+      res.send({ result, token });
     });
 
     /* post booking data in database */
@@ -50,8 +92,6 @@ const run = async () => {
       }
       const result = await bookingCollection.insertOne(bookingApointment);
       res.send({ success: true, result });
-
-      console.log(bookingApointment);
     });
 
     app.get("/available", async (req, res) => {
@@ -73,11 +113,16 @@ const run = async () => {
     });
 
     /* get paitent booking */
-    app.get("/booking", async (req, res) => {
+    app.get("/booking", verifyJwt, async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
-      const booking = await bookingCollection.find(query).toArray();
-      res.send(booking);
+      const decodedEmail = req.decoded;
+      if (email === decodedEmail) {
+        const booking = await bookingCollection.find(query).toArray();
+        res.send(booking);
+      } else {
+        res.status(403).send({ message: "forbidden access" });
+      }
     });
   } finally {
     // await client.close();
