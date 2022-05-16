@@ -63,6 +63,14 @@ const run = async () => {
       res.send(result);
     });
 
+    /* what user is admin check */
+    app.get("/admin/:email", verifyJwt, async (req, res) => {
+      const email = req.params.email;
+      const user = await userCollection.findOne({ email: email });
+      const isAdmin = user.role === "admin";
+      res.send({ admin: isAdmin });
+    });
+
     /* user data stored in database */
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
