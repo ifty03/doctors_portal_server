@@ -40,6 +40,18 @@ const run = async () => {
     const serviceCollection = client.db("doctors_db").collection("tritment");
     const bookingCollection = client.db("doctors_db").collection("booking");
     const userCollection = client.db("doctors_db").collection("users");
+    const doctorCollection = client.db("doctors_db").collection("doctors");
+
+    const verifyAdmin = async (req, res, next) => {
+      const decodedEmail = req.decoded;
+      console.log(decodedEmail);
+      const requester = await userCollection.findOne({ email: decodedEmail });
+      if (requester.role === "admin") {
+        next();
+      } else {
+        return res.status(403).send({ message: "request forbidden" });
+      }
+    };
 
     app.get("/service", async (req, res) => {
       const query = {};
@@ -49,6 +61,21 @@ const run = async () => {
         .toArray();
       res.send(service);
     });
+
+    /* post a doctor data */
+    app.post("/doctor", verifyJwt, verifyAdmin, async (req, res) => {
+      const doctor = req.body;
+      const exist = await doctorCollection.findOne({
+        email: doctor.email,
+        name: doctor.name,
+      });
+      if (exist) {
+        return res.send({ message: "doctor information already exist" });
+      }
+      const result = await doctorCollection.insertOne(doctor);
+      res.send(result);
+    });
+
     /* get all user in database */
     app.get("/users", verifyJwt, async (req, res) => {
       const users = await userCollection.find().toArray();
