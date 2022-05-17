@@ -43,7 +43,10 @@ const run = async () => {
 
     app.get("/service", async (req, res) => {
       const query = {};
-      const service = await serviceCollection.find(query).toArray();
+      const service = await serviceCollection
+        .find(query)
+        .project({ name: 1 })
+        .toArray();
       res.send(service);
     });
     /* get all user in database */
