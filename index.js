@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
@@ -60,6 +60,20 @@ const run = async () => {
         .project({ name: 1 })
         .toArray();
       res.send(service);
+    });
+
+    /* get all doctors information */
+    app.get("/doctor", verifyJwt, verifyAdmin, async (req, res) => {
+      const doctors = await doctorCollection.find().toArray();
+      res.send(doctors);
+    });
+
+    /* delete a doctor from database */
+    app.delete("/doctor/:id", verifyJwt, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await doctorCollection.deleteOne(query);
+      res.send(result);
     });
 
     /* post a doctor data */
